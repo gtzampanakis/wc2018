@@ -404,7 +404,7 @@ def run_from_file(inc):
     for repi in itertools.count():
         d = p_f(gs, m)
         p_est = dict(d)
-        pp('Iteration %s' % repi)
+        print 'Iteration %s' % repi
         ps_diffs = calc_ps_diffs(p_ref, p_est)
         for k in sorted(p_est, key = lambda k: -p_est[k]):
             print '%s %.3f %.3e %.3f' % (
