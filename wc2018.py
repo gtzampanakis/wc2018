@@ -67,6 +67,8 @@ import collections
 import itertools
 import re
 
+import pmemoize
+
 
 DEFAULT_RATING_SIGNED = 0.
 
@@ -99,44 +101,10 @@ def prod(ns):
     >>> prod([2, 25, 30])
     1500
     """
-    if len(ns) == 0:
-        return 1
-    elif len(ns) == 1:
-        return ns[0]
-    else:
-        return ns[0] * prod(ns[1:])
-
-
-def fnd(fn, *args):
-    """
-    Apply function to arguments, if distribution is encountered return a
-    distribution.
-
-    >>> from operator import add
-    >>> fnd(add, 5, 8)
-    13
-    >>> fnd(add, Dist([(8, .6), (7, .3), (4, .1)]), Dist([(9, .7), (2, .3)]))
-    [(17, 0.42), (10, 0.18), (16, 0.21), (9, 0.09), (13, 0.06999999999999999), (6, 0.03)]
-    >>> fnd(lambda x,y: x/(x+y), 5., Dist([(3., .8), (5., .2)]))
-    [(0.625, 0.8), (0.5, 0.2)]
-    >>> fnd(lambda x,y: x/(x+y), Dist([(5., 7), (4., 3)]), Dist([(3., 8), (5., 2)]))
-    [(0.625, 56), (0.5, 14), (0.5714285714285714, 24), (0.4444444444444444, 6)]
-    """
-    args = list(args)
-    for argi, arg in enumerate(args):
-        if not isinstance(arg, Dist):
-            args[argi] = Dist(((arg, 1.),))
-    result = []
-    for case in itertools.product(*args):
-        result.append((
-            fn(*[ci[0] for ci in case]),
-            prod([ci[1] for ci in case])
-        ))
-    if len(result) == 1:
-        assert result[0][1] == 1
-        return result[0][0]
-    else:
-        return Dist(result)
+    result = 1
+    for n in ns:
+        result *= n
+    return result
 
 
 def prob_match(t1, t2, m):
@@ -174,7 +142,6 @@ def group(ts, m):
         result.append((pair, p1 * p2))
     return Dist(result)
         
-
 
 def bracket(ts, m):
     """
@@ -216,7 +183,7 @@ def bracket(ts, m):
         result = Dist(result)
     elif len(ts) > 2:
         left, right = ts[:len(ts)/2], ts[len(ts)/2:]
-        result = bracket([bracket(left, m), bracket(right, m)], m)
+        result = bracket((bracket(left, m), bracket(right, m)), m)
     return result
 
 
@@ -240,7 +207,7 @@ def combd(*ds):
     result = []
     for comb in itertools.product(*ds):
         event = tuple(o[0] for o in comb)
-        p = prod([o[1] for o in comb])
+        p = prod(o[1] for o in comb)
         result.append((event, p))
     return result
 
@@ -316,9 +283,9 @@ def p_sfij_given_ga(i, ga, m):
      ('n', 0.44637681159420284)]
     """
     if i == 1:
-        return bracket([ga[0][0], ga[1][1], ga[2][0], ga[3][1]], m)
+        return bracket((ga[0][0], ga[1][1], ga[2][0], ga[3][1]), m)
     elif i == 2:
-        return bracket([ga[1][0], ga[0][1], ga[3][0], ga[2][1]], m)
+        return bracket((ga[1][0], ga[0][1], ga[3][0], ga[2][1]), m)
 	
 
 def p_sf1j_sf2j(gs, m):
@@ -390,15 +357,15 @@ def p_f(gs, m):
     >>> dist = sorted(p_f(gs, m))
     >>> assert abs(sum(o[1] for o in dist) - 1.0) < 1e-15
     >>> dist[-1]
-    ('p', 0.14805532756139597)
+    ('p', 0.148055327561396)
     """
     sf_dist = p_sf1a_sf2a_sf1b_sf2b(gs, m)
     result = []
     for sfpairs, psfpairs in sf_dist:
-        d = bracket([
+        d = bracket((
             sfpairs[0][0], sfpairs[1][0],
             sfpairs[0][1], sfpairs[1][1],
-        ], m)
+        ), m)
         for winner, pwinner in d:
             result.append((
                 winner, pwinner * psfpairs
@@ -440,7 +407,9 @@ def run_from_file(inc):
         pp('Iteration %s' % repi)
         ps_diffs = calc_ps_diffs(p_ref, p_est)
         for k in sorted(p_est, key = lambda k: -p_est[k]):
-            print k, 1./p_est[k], ps_diffs[k], m[k]
+            print '%s %.3f %.3e %.3f' % (
+                k, 1./p_est[k], ps_diffs[k], m[k]
+            )
         print
         print
         for t, diff in ps_diffs.iteritems():
@@ -448,4 +417,4 @@ def run_from_file(inc):
 
 
 if __name__ == '__main__':
-    run_from_file(2.)
+    run_from_file(6.)
